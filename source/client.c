@@ -99,36 +99,100 @@ void validate_arguments (char **ip, char **port, char **filename, char **keyword
 
 int is_valid_ip(const char *ip)
 {
-    int dots = 0;
+    if (ip == NULL) return 0;
+
+    size_t len = strlen(ip);
+
+    // IPv4 min length is 7, e.g., "0.0.0.0", IPv4 max length is 15, e.g., "255.255.255.255"
+    if (len < 7 || len > 15)
+    {
+        fprintf(stderr, "Error: Invalid IP length.\n");
+        return 0;
+    }
+
+    // Check for leading or trailing dots
+    if (ip[0] == '.' || ip[len - 1] == '.')
+    {
+        fprintf(stderr, "Error: IP cannot start or end with a dot.\n");
+        return 0;
+    }
+
+    // Check for consecutive dots
+    for (int i = 0; i < len - 1; i++)
+    {
+        if (ip[i] == '.' && ip[i + 1] == '.')
+        {
+            fprintf(stderr, "Error: Consecutive dots in IP address.\n");
+            return 0;
+        }
+    }
+
+    // Count total dots (must be exactly 3)
+    int dot_count = 0;
+    for (int i = 0; ip[i]; i++)
+    {
+        if (ip[i] == '.') dot_count++;
+    }
+    if (dot_count != 3)
+    {
+        fprintf(stderr, "Error: IP must contain exactly 3 dots.\n");
+        return 0;
+    }
+
+    // Copy to temporary buffer for tokenization
     char temp[16];
-
-    if (ip == NULL || strlen(ip) > 15) return 0;
-
     strncpy(temp, ip, sizeof(temp) - 1);
     temp[sizeof(temp) - 1] = '\0';
 
+    // Split into segments and validate each
+    int segments = 0;
     char *token = strtok(temp, ".");
-    while (token)
+    while (token != NULL)
     {
-        char *endptr;
-        long num = strtol(token, &endptr, 10);
-        if (*endptr != '\0')
+        // Check if segment is empty (strtok skips empty, but our checks above prevent this) (consecutive dots check)
+        if (*token == '\0')
         {
-            fprintf(stderr, "Error: Invalid IP format. Only numbers and dots are allowed.\n");
+            fprintf(stderr, "Error: Empty IP segment.\n");
             return 0;
         }
 
+        // Check for non-digit characters
+        for (int i = 0; token[i]; i++)
+        {
+            if (!isdigit((unsigned char)token[i]))
+            {
+                fprintf(stderr, "Error: Invalid character '%c' in IP segment.\n", token[i]);
+                return 0;
+            }
+        }
+
+        // Avoid leading zeros (e.g., "01" is invalid unless the segment is "0")
+        if (strlen(token) > 1 && token[0] == '0')
+        {
+            fprintf(stderr, "Error: Segment '%s' has leading zeros.\n", token);
+            return 0;
+        }
+
+        // Convert to number and check range
+        long num = strtol(token, NULL, 10);
         if (num < 0 || num > 255)
         {
             fprintf(stderr, "Error: IP segment '%s' is out of range (0-255).\n", token);
             return 0;
         }
 
-        dots++;  // Count segments (not dots)
+        segments++;
         token = strtok(NULL, ".");
     }
 
-    return dots == 4 ? 1 : 0;  // IPv4 must have exactly 4 parts
+    // Ensure exactly 4 segments
+    if (segments != 4)
+    {
+        fprintf(stderr, "Error: IP must have exactly 4 segments.\n");
+        return 0;
+    }
+
+    return 1;  // Valid IPv4
 }
 
 
