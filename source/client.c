@@ -4,12 +4,12 @@
 #include <ctype.h>
 #include <limits.h>
 
-
 void validate_argument_number(int argc);
 void parse_arguments(int argc, char *argv[], char **ip, char **port, char **filename, char **keyword);
+void validate_arguments(char **ip, char **port, char **filename, char **keyword);
 int is_valid_ip(const char *ip);
 int is_valid_port(const char *port);
-void validate_arguments(char **ip, char **port, char **filename, char **keyword);
+int is_valid_file(const char *filename);
 
 int main(int argc, char *argv[])
 {
@@ -87,6 +87,10 @@ void validate_arguments (char **ip, char **port, char **filename, char **keyword
     {
         fprintf(stderr, "Error: Filename cannot be empty.\n");
         exit(EXIT_FAILURE);
+    }
+    else
+    {
+      !is_valid_file(*filename);
     }
 
     // Validate Keyword
@@ -195,7 +199,6 @@ int is_valid_ip(const char *ip)
     return 1;  // Valid IPv4
 }
 
-
 int is_valid_port(const char *port)
 {
     char *endptr;
@@ -214,4 +217,24 @@ int is_valid_port(const char *port)
     }
 
     return 1;  // Valid port
+}
+
+int is_valid_file(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error: File '%s' does not exist.\n", filename);
+        return 0;
+    }
+    else
+    {
+        fseek(file, 0, SEEK_END);
+        if (ftell(file) == 0) {
+            fprintf(stderr, "Error: File '%s' is empty.\n", filename);
+            fclose(file);
+            return 0;
+        }
+    }
+
+    fclose(file);
+    return 1;
 }
