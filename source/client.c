@@ -18,7 +18,7 @@ int is_valid_file(const char *filename);
 long get_file_size(FILE* file);
 char* read_file_content(FILE* file, long file_size);
 int create_client_fd();
-void config_server(char *port, char *ip, int client_fd);
+void connect_server(char *port, char *ip, int client_fd);
 void send_message_to_server(int client_socket, const char* message, long size);
 void receive_server_response(int client_socket);
 void close_socket(int client_socket);
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     int client_fd = create_client_fd();
     printf("Socket Created\n");
 
-    config_server(port, ip, client_fd);
+    connect_server(port, ip, client_fd);
     send_message_to_server(client_fd, file_content, file_size);
     receive_server_response(client_fd);
     close_socket(client_fd);
@@ -207,7 +207,8 @@ char* read_file_content(FILE* file, long file_size) {
 }
 
 // Create client socket
-int create_client_fd() {
+int create_client_fd()
+{
     int client_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (client_fd == -1) {
         perror("ERR: Socket creation failed");
@@ -217,7 +218,7 @@ int create_client_fd() {
 }
 
 //Configure server address
-void config_server(char *port, char *ip, int client_fd)
+void connect_server(char *port, char *ip, int client_fd)
 {
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
