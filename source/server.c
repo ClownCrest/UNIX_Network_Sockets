@@ -236,6 +236,10 @@ void process_client_message(int client_socket)
                 message[message_len] = '\0';  // Null-terminate the message
             }
 
+            //prints the Key for verification
+            print("Message received from client.\n");
+            printf("Key received from client: %s\n", keyword);
+
             // Encrypt the message using the Vigenère cipher
             vigenere_cipher(message, keyword);
 
