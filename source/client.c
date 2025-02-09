@@ -9,7 +9,6 @@
 
 #define BUFFER_SIZE 1024
 
-// Function declarations
 void validate_argument_number(int argc);
 void parse_arguments(int argc, char *argv[], char **ip, char **port, char **filename, char **keyword);
 void validate_arguments(char **ip, char **port, char **filename, char **keyword);
@@ -29,60 +28,51 @@ int main(int argc, char *argv[])
 {
     char *ip = NULL, *port = NULL, *filename = NULL, *keyword = NULL;
 
-    // Validate the number of arguments
     validate_argument_number(argc);
-
-    // Parse command-line arguments
     parse_arguments(argc, argv, &ip, &port, &filename, &keyword);
-
-    // Validate the parsed arguments
     validate_arguments(&ip, &port, &filename, &keyword);
 
-    // Open file for reading
     FILE* file = fopen(filename, "r");
     if (!file) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
 
-    // Get file size
     long file_size = get_file_size(file);
-
-    // Read file content into memory
     char* file_content = read_file_content(file, file_size);
 
-    printf("Creating socket...\n");
+    //printf("IP Address: %s\n", ip);
+   // printf("Port: %s\n", port);
+   // printf("Filename: %s\n", filename);
+    //printf("Keyword: %s\n", keyword);
+   // printf("Filesize: %ld\n", file_size);
+   // printf("File contents: %s\n", file_content);
 
-    // Create client socket
+    printf("Creating socket...\n");
     int client_fd = create_client_fd();
     printf("Socket Created\n");
 
-    // Connect to the server
     connect_server(port, ip, client_fd);
+// After sending all data:
+send_message_to_server(client_fd, keyword, strlen(keyword));
+send_message_to_server(client_fd, "\n", 1);
+send_message_to_server(client_fd, file_content, file_size);
+printf("Message sent to the server.\n\n");
 
-    // Send keyword and file content to server
-    send_message_to_server(client_fd, keyword, strlen(keyword));
-    send_message_to_server(client_fd, "\n", 1);
-    send_message_to_server(client_fd, file_content, file_size);
-    printf("Message sent to the server.\n\n");
+// Shutdown write side to indicate no more data
+shutdown(client_fd, SHUT_WR);
 
-    // Shutdown write side to indicate no more data
-    shutdown(client_fd, SHUT_WR);
-
-    // Wait for server response
-    receive_server_response(client_fd);
-
-    // Close client socket
+// Now wait for server response
+receive_server_response(client_fd);
     close_socket(client_fd);
 
-    // Free allocated memory and close file
     free(file_content);
     fclose(file);
 
     return 0;
 }
 
-// Validate the number of command-line arguments
+
 void validate_argument_number(int argc)
 {
     if (argc != 9)
@@ -92,7 +82,6 @@ void validate_argument_number(int argc)
     }
 }
 
-// Parse command-line arguments
 void parse_arguments(int argc, char *argv[], char **ip, char **port, char **filename, char **keyword)
 {
     for (int i = 1; i < argc; i++)
@@ -123,9 +112,124 @@ void parse_arguments(int argc, char *argv[], char **ip, char **port, char **file
     }
 }
 
-// Additional validation functions...
+void validate_arguments (char **ip, char **port, char **filename, char **keyword)
+{
+    // Validate IP Address
+    if (*ip == NULL || !is_valid_ip(*ip))
+    {
+        fprintf(stderr, "Error: Invalid IP Address format. Expected format: xxx.xxx.xxx.xxx\n");
+        exit(EXIT_FAILURE);
+    }
 
-// Function to create a client socket
+    // Validate Port
+    if (*port == NULL || !is_valid_port(*port))
+    {
+        fprintf(stderr, "Error: Invalid Port. Must be a number between 1 and 65535.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Validate Filename
+    if (*filename == NULL || strlen(*filename) == 0)
+    {
+        fprintf(stderr, "Error: Filename cannot be empty.\n");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        if (!is_valid_file(*filename)) {
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    // Validate Keyword
+    if (*keyword == NULL || strlen(*keyword) == 0 || !is_valid_keyword(*keyword))
+    {
+        fprintf(stderr, "Error: Keyword cannot be empty.\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+int is_valid_ip(const char *ip)
+{
+    struct sockaddr_in sa;
+    return inet_pton(AF_INET, ip, &(sa.sin_addr)) != 0;
+}
+
+int is_valid_port(const char *port) {
+    char *endptr;
+    long port_num = strtol(port, &endptr, 10);
+
+    if (*endptr != '\0' || port_num < 1 || port_num > 65535)
+        return 0;
+
+    // Prevent leading zeros like "0123"
+    if (port[0] == '0' && strlen(port) > 1)
+        return 0;
+
+    return 1;
+}
+
+int is_valid_file(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        fprintf(stderr, "Error: File '%s' does not exist.\n", filename);
+        return 0;
+    }
+    else
+    {
+        fseek(file, 0, SEEK_END);
+        if (ftell(file) == 0) {
+            fprintf(stderr, "Error: File '%s' is empty.\n", filename);
+            fclose(file);
+            return 0;
+        }
+    }
+
+    fclose(file);
+    return 1;
+}
+
+int is_valid_keyword(const char *keyword)
+{
+    for (int i = 0; keyword[i] != '\0'; i++)
+    {
+        if (isdigit(keyword[i]))
+        {
+            fprintf(stderr,"Error: Keyword can't have numeric value. \n");
+            return 0;
+        }
+    }
+    return 1;
+}
+
+// Get file size
+long get_file_size(FILE* file) {
+    fseek(file, 0, SEEK_END);
+    long size = ftell(file);
+    rewind(file);
+    return size;
+}
+
+// Read file content into memory
+char* read_file_content(FILE* file, long file_size) {
+    char* buffer = malloc(file_size + 1);
+    if (!buffer) {
+        perror("Memory allocation failed");
+        exit(EXIT_FAILURE);
+    }
+
+    size_t bytes_read = fread(buffer, 1, file_size, file);
+    if (bytes_read != file_size) {
+        perror("File read error");
+        free(buffer);
+        exit(EXIT_FAILURE);
+    }
+
+    buffer[file_size] = '\0';
+    return buffer;
+}
+
+// Create client socket
 int create_client_fd()
 {
     int client_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -136,7 +240,7 @@ int create_client_fd()
     return client_fd;
 }
 
-// Function to connect to the server
+//Configure server address
 void connect_server(char *port, char *ip, int client_fd)
 {
     struct sockaddr_in serv_addr;
@@ -148,6 +252,7 @@ void connect_server(char *port, char *ip, int client_fd)
         exit(EXIT_FAILURE);
     }
 
+    // CONNECT TO SOCKET
     if (connect(client_fd,(struct sockaddr *) &serv_addr, sizeof(serv_addr)) == -1 ) {
         perror("Connection Failed");
         exit(EXIT_FAILURE);
@@ -155,7 +260,6 @@ void connect_server(char *port, char *ip, int client_fd)
     printf("Connected to the server...\n");
 }
 
-// Function to send message to server
 void send_message_to_server(int client_socket, const char* message, long size) {
     long total_sent = 0;
     while (total_sent < size) {
@@ -169,7 +273,7 @@ void send_message_to_server(int client_socket, const char* message, long size) {
     }
 }
 
-// Function to receive server response
+// Receive server response
 void receive_server_response(int client_socket) {
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
@@ -194,4 +298,9 @@ void receive_server_response(int client_socket) {
         }
     }
     printf("\nDisconnected from the server.\n");
+}
+
+// Close socket safely
+void close_socket(int client_socket) {
+    close(client_socket);
 }

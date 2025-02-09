@@ -1,4 +1,3 @@
-# Include necessary libraries
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +9,6 @@
 #define BUFFER_SIZE 1024
 #define BACKLOG 10
 
-// Function declarations
 void validate_argument_number(int argc);
 void parse_arguments(int argc, char *argv[], char **ip, char **port);
 void validate_arguments(char **ip, char **port);
@@ -42,7 +40,6 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-// Validate the number of arguments provided
 void validate_argument_number(int argc)
 {
     if (argc != 5)
@@ -52,7 +49,6 @@ void validate_argument_number(int argc)
     }
 }
 
-// Parse command line arguments for IP and port
 void parse_arguments(int argc, char *argv[], char **ip, char **port)
 {
     for (int i = 1; i < argc; i++)
@@ -75,7 +71,6 @@ void parse_arguments(int argc, char *argv[], char **ip, char **port)
     }
 }
 
-// Validate the IP address and port
 void validate_arguments(char **ip, char **port)
 {
     if (*ip == NULL || !is_valid_ip(*ip))
@@ -91,14 +86,12 @@ void validate_arguments(char **ip, char **port)
     }
 }
 
-// Check if the given IP address is valid
 int is_valid_ip(const char *ip)
 {
     struct sockaddr_in sa;
     return inet_pton(AF_INET, ip, &(sa.sin_addr)) != 0;
 }
 
-// Check if the given port is valid
 int is_valid_port(const char *port)
 {
     char *endptr;
@@ -113,7 +106,6 @@ int is_valid_port(const char *port)
     return 1;
 }
 
-// Create a socket for the server
 int create_server_fd()
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -125,7 +117,6 @@ int create_server_fd()
     return server_fd;
 }
 
-// Configure and bind the server socket
 void config_server(const char *ip, const char *port, int server_fd)
 {
     struct sockaddr_in serv_addr;
@@ -156,7 +147,6 @@ void config_server(const char *ip, const char *port, int server_fd)
     }
 }
 
-// Accept client connections and process messages
 void accept_client_connections(int server_socket)
 {
     while (1)
@@ -178,12 +168,80 @@ void accept_client_connections(int server_socket)
     }
 }
 
-// Encrypt text using Vigenere cipher
+void process_client_message(int client_socket) {
+    char buffer[BUFFER_SIZE];
+    char keyword[BUFFER_SIZE] = {0};
+    ssize_t bytes_read;
+    int keyword_received = 0;
+    size_t buffer_offset = 0;
+
+    // Read until keyword is found
+    while (!keyword_received && (bytes_read = recv(client_socket, buffer + buffer_offset, BUFFER_SIZE - buffer_offset - 1, 0)) > 0) {
+        buffer_offset += bytes_read;
+        buffer[buffer_offset] = '\0';
+
+        char *newline_pos = strchr(buffer, '\n');
+        if (newline_pos) {
+            *newline_pos = '\0';
+            strncpy(keyword, buffer, sizeof(keyword) - 1);
+            size_t message_start = newline_pos - buffer + 1;
+            size_t message_len = buffer_offset - message_start;
+
+            // Initialize message buffer with remaining data
+            char *message = malloc(message_len + 1);
+            if (!message) {
+                perror("malloc failed");
+                return;
+            }
+            memcpy(message, buffer + message_start, message_len);
+            message[message_len] = '\0';
+
+            // Read remaining data for the message
+            while ((bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0)) > 0) {
+                buffer[bytes_read] = '\0';
+                // Resize message buffer and append new data
+                char *temp = realloc(message, message_len + bytes_read + 1);
+                if (!temp) {
+                    perror("realloc failed");
+                    free(message);
+                    return;
+                }
+                message = temp;
+                memcpy(message + message_len, buffer, bytes_read);
+                message_len += bytes_read;
+                message[message_len] = '\0';
+            }
+
+            //printf("Received keyword: %s\n", keyword);
+           // printf("Received message: %s\n", message);
+
+            vigenere_cipher(message, keyword);
+
+            // Send encrypted message back
+            send(client_socket, message, message_len, 0);
+            printf("Encrypted message sent back to client.\n");
+
+            free(message);
+            keyword_received = 1;
+            break;
+        }
+    }
+
+    if (bytes_read == -1) {
+        perror("recv error");
+    }
+
+    if (!keyword_received) {
+        printf("Error receiving keyword or message.\n");
+    }
+}
+
+
 void vigenere_cipher(char *text, const char *key) {
     int text_len = strlen(text);
     int key_len = strlen(key);
 
-    // Normalize key to uppercase
+    // Normalize the key to uppercase (ignore non-alphabetic characters)
     char *key_upper = malloc(key_len + 1);
     int valid_key_len = 0;
     for (int i = 0; i < key_len; i++) {
@@ -198,7 +256,6 @@ void vigenere_cipher(char *text, const char *key) {
         return;
     }
 
-    // Encrypt the text
     for (int i = 0, j = 0; i < text_len; i++) {
         if (isupper(text[i])) {
             text[i] = ((text[i] - 'A' + (key_upper[j % valid_key_len] - 'A')) % 26) + 'A';
