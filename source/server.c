@@ -237,7 +237,7 @@ void process_client_message(int client_socket)
             }
 
             //prints the Key for verification
-            print("Message received from client.\n");
+            printf("Message received from client.\n");
             printf("Key received from client: %s\n", keyword);
 
             // Encrypt the message using the Vigenère cipher
