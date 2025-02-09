@@ -15,11 +15,13 @@ void parse_arguments(int argc, char *argv[], char **ip, char **port);
 void validate_arguments(char **ip, char **port);
 int is_valid_ip(const char *ip);
 int is_valid_port(const char *port);
+void handle_signal(int signal);
 int create_server_fd();
 void config_server(const char *ip, const char *port, int server_fd);
 void accept_client_connections(int server_socket);
 void process_client_message(int client_socket);
 void vigenere_cipher(char *text, const char *key);
+void cleanup();
 
 int main(int argc, char *argv[])
 {
@@ -30,6 +32,8 @@ int main(int argc, char *argv[])
 
     printf("IP Address: %s\n", ip);
     printf("Port: %s\n", port);
+
+    signal(SIGINT, handle_signal);
 
     // Create the server socket
     printf("Creating socket...\n");
@@ -179,8 +183,17 @@ void accept_client_connections(int server_socket)
         printf("Client connected.\n");
         process_client_message(client_socket);  // Process the client's message
 
-        close(client_socket);  // Close the client socket after processing
+        void cleanup();  // Close the client socket after processing
         printf("Client disconnected.\n\n");
+    }
+}
+
+// Handle SIGINT for graceful shutdown
+void handle_signal(int signal) {
+    if (signal == SIGINT) {
+        printf("\nCaught SIGINT (Ctrl+C). Shutting down...\n");
+        cleanup();
+        exit(EXIT_SUCCESS);
     }
 }
 
@@ -305,4 +318,12 @@ void vigenere_cipher(char *text, const char *key)
     }
 
     free(key_upper);  // Free the dynamically allocated memory for the key
+}
+
+// Cleanup server resources
+void cleanup() {
+    if (server_socket != -1) {
+        close(client_socket);
+        printf("Server socket closed.\n");
+    }
 }
