@@ -10,6 +10,8 @@
 #define BUFFER_SIZE 1024  // Buffer size for data transfer
 #define BACKLOG 10        // Max number of pending connections in the server's queue
 
+static int server_fd = -1; // Global server socket file descriptor
+
 // Function declarations
 void validate_argument_number(int argc);
 void parse_arguments(int argc, char *argv[], char **ip, char **port);
@@ -38,7 +40,7 @@ int main(int argc, char *argv[])
 
     // Create the server socket
     printf("Creating socket...\n");
-    int server_fd = create_server_fd();
+    server_fd = create_server_fd();
     printf("Socket Created\n");
 
     // Configure the server with the provided IP and port
@@ -141,7 +143,11 @@ void config_server(const char *ip, const char *port, int server_fd)
     struct sockaddr_in serv_addr;
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_port = htons(strtol(port, NULL, 10));  // Convert port to network byte order
-    serv_addr.sin_addr.s_addr = inet_addr(ip);  // Convert IP address to binary format
+
+    if (inet_pton(AF_INET, ip, &serv_addr.sin_addr) <= 0) {
+        perror("Invalid IP address");
+        exit(EXIT_FAILURE);
+    }
 
     int enable = 1;
     if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1)  // Set socket options
@@ -184,7 +190,7 @@ void accept_client_connections(int server_socket)
         printf("Client connected.\n");
         process_client_message(client_socket);  // Process the client's message
 
-        void cleanup();  // Close the client socket after processing
+        close(client_socket);  // Close the client socket after processing
         printf("Client disconnected.\n\n");
     }
 }
@@ -257,8 +263,16 @@ void process_client_message(int client_socket)
             // Encrypt the message using the Vigenère cipher
             vigenere_cipher(message, keyword);
 
-            // Send the encrypted message back to the client
-            send(client_socket, message, message_len, 0);
+            // Send the encrypted message back to the client, handling partial sends
+            ssize_t total_sent = 0;
+            while (total_sent < message_len) {
+                ssize_t bytes_sent = send(client_socket, message + total_sent, message_len - total_sent, 0);
+                if (bytes_sent == -1) {
+                    perror("send error");
+                    break;
+                }
+                total_sent += bytes_sent;
+            }
             printf("Encrypted message sent back to client.\n");
 
             free(message);  // Free the dynamically allocated message buffer
@@ -323,8 +337,9 @@ void vigenere_cipher(char *text, const char *key)
 
 // Cleanup server resources
 void cleanup() {
-    if (server_socket != -1) {
-        close(client_socket);
+    if (server_fd != -1) {
+        close(server_fd);
+        server_fd = -1;
         printf("Server socket closed.\n");
     }
 }
