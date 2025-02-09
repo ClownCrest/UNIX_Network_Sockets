@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <signal.h>
 
 #define BUFFER_SIZE 1024  // Buffer size for data transfer
 #define BACKLOG 10        // Max number of pending connections in the server's queue
