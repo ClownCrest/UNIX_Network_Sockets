@@ -15,6 +15,7 @@ void validate_arguments(char **ip, char **port, char **filename, char **keyword)
 int is_valid_ip(const char *ip);
 int is_valid_port(const char *port);
 int is_valid_file(const char *filename);
+int is_valid_keyword (const char *keyword);
 long get_file_size(FILE* file);
 char* read_file_content(FILE* file, long file_size);
 int create_client_fd();
@@ -40,20 +41,29 @@ int main(int argc, char *argv[])
     long file_size = get_file_size(file);
     char* file_content = read_file_content(file, file_size);
 
-    printf("IP Address: %s\n", ip);
-    printf("Port: %s\n", port);
-    printf("Filename: %s\n", filename);
-    printf("Keyword: %s\n", keyword);
-    printf("Filesize: %ld\n", file_size);
-    printf("File contents: %s\n", file_content);
+    //printf("IP Address: %s\n", ip);
+   // printf("Port: %s\n", port);
+   // printf("Filename: %s\n", filename);
+    //printf("Keyword: %s\n", keyword);
+   // printf("Filesize: %ld\n", file_size);
+   // printf("File contents: %s\n", file_content);
 
     printf("Creating socket...\n");
     int client_fd = create_client_fd();
     printf("Socket Created\n");
 
     connect_server(port, ip, client_fd);
-    send_message_to_server(client_fd, file_content, file_size);
-    receive_server_response(client_fd);
+// After sending all data:
+send_message_to_server(client_fd, keyword, strlen(keyword));
+send_message_to_server(client_fd, "\n", 1);
+send_message_to_server(client_fd, file_content, file_size);
+printf("Message sent to the server.\n\n");
+
+// Shutdown write side to indicate no more data
+shutdown(client_fd, SHUT_WR);
+
+// Now wait for server response
+receive_server_response(client_fd);
     close_socket(client_fd);
 
     free(file_content);
@@ -132,7 +142,7 @@ void validate_arguments (char **ip, char **port, char **filename, char **keyword
     }
 
     // Validate Keyword
-    if (*keyword == NULL || strlen(*keyword) == 0)
+    if (*keyword == NULL || strlen(*keyword) == 0 || !is_valid_keyword(*keyword))
     {
         fprintf(stderr, "Error: Keyword cannot be empty.\n");
         exit(EXIT_FAILURE);
@@ -176,6 +186,19 @@ int is_valid_file(const char *filename) {
     }
 
     fclose(file);
+    return 1;
+}
+
+int is_valid_keyword(const char *keyword) 
+{
+    for (int i = 0; keyword[i] != '\0'; i++) 
+    {
+        if (isdigit(keyword[i])) 
+        {
+            fprintf(stderr,"Error: Keyword can't have numeric value. \n");
+            return 0;
+        }
+    }
     return 1;
 }
 
@@ -237,14 +260,17 @@ void connect_server(char *port, char *ip, int client_fd)
     printf("Connected to the server...\n");
 }
 
-// Send message to the server
 void send_message_to_server(int client_socket, const char* message, long size) {
-    if (send(client_socket, message, size, 0) == -1) {
-        perror("ERR: Failed to send message");
-        close_socket(client_socket);
-        exit(EXIT_FAILURE);
+    long total_sent = 0;
+    while (total_sent < size) {
+        ssize_t sent = send(client_socket, message + total_sent, size - total_sent, 0);
+        if (sent == -1) {
+            perror("ERR: Failed to send message");
+            close_socket(client_socket);
+            exit(EXIT_FAILURE);
+        }
+        total_sent += sent;
     }
-    printf("Message sent to the server.\n\n");
 }
 
 // Receive server response

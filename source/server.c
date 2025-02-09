@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #define BUFFER_SIZE 1024
 #define BACKLOG 10
@@ -17,6 +18,7 @@ int create_server_fd();
 void config_server(const char *ip, const char *port, int server_fd);
 void accept_client_connections(int server_socket);
 void process_client_message(int client_socket);
+void vigenere_cipher(char *text, const char *key);
 
 int main(int argc, char *argv[])
 {
@@ -166,39 +168,103 @@ void accept_client_connections(int server_socket)
     }
 }
 
-void process_client_message(int client_socket)
-{
+void process_client_message(int client_socket) {
     char buffer[BUFFER_SIZE];
+    char keyword[BUFFER_SIZE] = {0};
     ssize_t bytes_read;
-    bool done_receiving = false;
+    int keyword_received = 0;
+    size_t buffer_offset = 0;
 
-    while (!done_receiving)
-    {
-        memset(buffer, 0, sizeof(buffer));
-        bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
+    // Read until keyword is found
+    while (!keyword_received && (bytes_read = recv(client_socket, buffer + buffer_offset, BUFFER_SIZE - buffer_offset - 1, 0)) > 0) {
+        buffer_offset += bytes_read;
+        buffer[buffer_offset] = '\0';
 
-        if (bytes_read > 0)
-        {
-            buffer[bytes_read] = '\0';
+        char *newline_pos = strchr(buffer, '\n');
+        if (newline_pos) {
+            *newline_pos = '\0';
+            strncpy(keyword, buffer, sizeof(keyword) - 1);
+            size_t message_start = newline_pos - buffer + 1;
+            size_t message_len = buffer_offset - message_start;
 
-            send(client_socket, buffer, strlen(buffer), 0);
-
-            if (bytes_read < BUFFER_SIZE - 1)
-            {
-                done_receiving = true;
+            // Initialize message buffer with remaining data
+            char *message = malloc(message_len + 1);
+            if (!message) {
+                perror("malloc failed");
+                return;
             }
-        }
-        else if (bytes_read == 0)
-        {
-            printf("Client closed the connection.\n");
-            done_receiving = true;
-        }
-        else
-        {
-            perror("ERR: Receive failed");
-            done_receiving = true;
+            memcpy(message, buffer + message_start, message_len);
+            message[message_len] = '\0';
+
+            // Read remaining data for the message
+            while ((bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0)) > 0) {
+                buffer[bytes_read] = '\0';
+                // Resize message buffer and append new data
+                char *temp = realloc(message, message_len + bytes_read + 1);
+                if (!temp) {
+                    perror("realloc failed");
+                    free(message);
+                    return;
+                }
+                message = temp;
+                memcpy(message + message_len, buffer, bytes_read);
+                message_len += bytes_read;
+                message[message_len] = '\0';
+            }
+
+            //printf("Received keyword: %s\n", keyword);
+           // printf("Received message: %s\n", message);
+
+            vigenere_cipher(message, keyword);
+
+            // Send encrypted message back
+            send(client_socket, message, message_len, 0);
+            printf("Encrypted message sent back to client.\n");
+
+            free(message);
+            keyword_received = 1;
+            break;
         }
     }
 
-    printf("Finished sending encrypted data.\n");
+    if (bytes_read == -1) {
+        perror("recv error");
+    }
+
+    if (!keyword_received) {
+        printf("Error receiving keyword or message.\n");
+    }
+}
+
+
+void vigenere_cipher(char *text, const char *key) {
+    int text_len = strlen(text);
+    int key_len = strlen(key);
+
+    // Normalize the key to uppercase (ignore non-alphabetic characters)
+    char *key_upper = malloc(key_len + 1);
+    int valid_key_len = 0;
+    for (int i = 0; i < key_len; i++) {
+        if (isalpha(key[i])) {
+            key_upper[valid_key_len++] = toupper(key[i]);
+        }
+    }
+    key_upper[valid_key_len] = '\0';
+
+    if (valid_key_len == 0) {
+        free(key_upper);
+        return;
+    }
+
+    for (int i = 0, j = 0; i < text_len; i++) {
+        if (isupper(text[i])) {
+            text[i] = ((text[i] - 'A' + (key_upper[j % valid_key_len] - 'A')) % 26) + 'A';
+            j++;
+        } else if (islower(text[i])) {
+            text[i] = ((text[i] - 'a' + (key_upper[j % valid_key_len] - 'A')) % 26) + 'a';
+            j++;
+        }
+    }
+
+    free(key_upper);
 }
