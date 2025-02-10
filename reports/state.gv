@@ -1,0 +1,121 @@
+digraph CommunicationFlow {
+    // Node Definitions: Client States
+    start_client [label="Client: START", shape=ellipse, style=filled, fillcolor=lightgreen];
+	pharse_client [label="Client: PHARSE_ARGS", shape=box];
+	validate_client [label="Client: VALIDATE Arguments", shape=box];
+	usage_client [label="Client: USAGE", shape=box];
+	handle_client [label="Client: HANDLE_ARGS", shape=box];
+	read_file_client [label="Client: Read FILE", shape=box];
+    create_client_fd [label="Client: INIT SOCKET", shape=box];
+	connect_server [label="Client: CONNECT to Server", shape=box];
+	send_message_to_server[label="Client: SEND Message and Key to Server", shape=box];
+	receive_server_response [label="Client: RECEIVE Response from Server", shape=box];
+	display_message_client [label="Client: Displays Received Message", shape=box];
+	close_socket [label="Client: Close Socket / CLEANUP", shape=box];
+    end_client [label="Client: EXIT", shape=ellipse, style=filled, fillcolor=lightgreen];
+
+    // Node Definitions: Server States
+    start_server [label="Server: START", shape=ellipse, style=filled, fillcolor=lightblue];
+	parse_arguments [label="Server: PHARSE_ARGS", shape=box];
+	validate_arguments [label="Server: VALIDATE Arguments", shape=box];
+	usage_server [label="Server: USAGE", shape=box];
+	handle_server [label="Server: HANDLE_ARGS", shape=box];
+	create_server_fd [label="Server: INIT SOCKET", shape=box];
+	listen_server [label="Server: LISTEN for Clients", shape=box];
+	accept_client_connections [label="Server: ACCEPT Connection from Client", shape=box];
+    receive_message_server [label="Server: RECEIVE Message", shape=box];
+	encrypts_server [label="Server: ENCRYPTS Message using they Key received", shape=box];
+    process_client_message [label="Server: SEND Response to Client", shape=box];
+	close_connection_server [label="Server: Close connection", shape=box];
+	close_socket_connection_server [label="Server: Close Socket", shape=box];
+	cleanup_server [label="Server: CLEANUP", shape=box];
+    exit_server [label="Server: EXIT", shape=ellipse, style=filled, fillcolor=lightblue];
+
+    // Client State Transitions
+    start_client -> pharse_client [label="main"];
+	pharse_client -> validate_client [label="validate_arguments"];
+	validate_client -> usage_client [label="Wrong usage"];
+	usage_client -> end_client [style=dotted];
+	validate_client -> handle_client [label="main"];
+	handle_client -> read_file_client [label="open_file"];
+	read_file_client -> create_client_fd [label="create_client_socket"];
+	read_file_client -> end_client [label="Empty or File not Found", style=dotted];
+	create_client_fd -> connect_server [label="connect_to_server"];
+	connect_server -> send_message_to_server[label="send_message_to_server"];
+	send_message_to_server-> receive_server_response [label="receive_server_response"];
+	receive_server_response -> display_message_client [label="receive_server_response"];
+	display_message_client -> close_socket [label="close_socket"];
+	close_socket -> end_client;
+
+
+    // Server State Transitions
+    start_server -> parse_arguments [label="main"];
+    parse_arguments -> validate_arguments [label="validate_arguments"];
+    validate_arguments -> usage_server [label="Wrong usage"];
+	usage_server -> exit_server [style=dotted];
+    validate_arguments -> handle_server [label="main"];
+	handle_server -> create_server_fd [label="setup_server_socket"];
+	create_server_fd -> listen_server [label="setup_server_socket"];
+	listen_server -> accept_client_connections [label="accept_client_connections"];
+	accept_client_connections -> receive_message_server [label="process_client_message"];
+	receive_message_server -> encrypts_server [label="process_client_message"];
+	encrypts_server -> process_client_message [label="process_client_message"];
+	process_client_message -> close_connection_server [label="process_client_message"];
+	close_connection_server -> listen_server [label="loops"];
+	listen_server -> close_socket_connection_server [label="handle_signal"];
+	close_socket_connection_server -> cleanup_server [label="cleanup"];
+	cleanup_server -> exit_server;
+	
+	
+
+	connect_server -> accept_client_connections [label="Client: Initiates Communication", style=dotted, color=blue];
+    send_message_to_server-> receive_message_server [label="Client Sends Message", style=dotted, color=blue];
+	process_client_message -> receive_server_response [label="Server Sends Encrypted Message", style=dotted, color=blue];
+	
+	
+
+    // Clear Division for Client and Server
+    subgraph cluster_client {
+        label = "Client Flow";
+        style = dashed;
+        color = lightgreen;
+        start_client;
+		pharse_client;
+        validate_client;
+		usage_client;
+		handle_client;
+        read_file_client;
+        create_client_fd;
+        connect_server;
+        send_client;
+        receive_server_response;
+		display_message_client;
+        close_socket;
+        end_client;
+    }
+
+    subgraph cluster_server {
+        label = "Server Flow";
+        style = dashed;
+        color = lightblue;
+        start_server;
+        validate_arguments;
+		parse_arguments;
+		usage_server;
+		handle_server;
+        create_server_fd;
+        listen_server;
+        accept_client_connections;
+        receive_message_server;
+		encrypts_server;
+        process_client_message;
+		close_connection_server;
+        cleanup_server;
+		close_socket_connection_server
+        exit_server;
+    }
+
+    // Styling for transitions
+    edge [fontsize=10, fontname="Helvetica", color=black];
+    node [fontname="Helvetica", fontsize=12];
+}
