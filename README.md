@@ -1,6 +1,6 @@
 # UnixNetworkSockets
 ## Purpose:
-This client-server application demonstrates network communication using sockets. It operates with two sockets—a client and a server—that communicate over a predefined IP address and port. The client sends a key and a file's contents to the server, which encrypts the data using the key and returns the encrypted result. The server supports I/O multiplexing, enabling it to handle multiple clients simultaneously, up to a preset limit of five.
+This client-server application demonstrates network communication using sockets. It operates with two sockets—a client and a server—that communicate over a predefined IP address and port. The client sends a key and a file's contents to the server, which encrypts the data using the key and returns the encrypted result.
 
 ## Installing:
 
